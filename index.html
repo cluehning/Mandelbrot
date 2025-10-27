@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Julia Mengen ↔ Mandelbrot — Interaktive Darstellung</title>
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#071019;
+      --card: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      --muted:#9aa6b2;
+      --accent:#6ee7b7;
+      --glass: rgba(255,255,255,0.04);
+      --radius:12px;
+      --canvas-size:420px;
+      --panel-width:360px;
+      --tooltip-bg: rgba(10,14,20,0.95);
+      --tooltip-color: #e6eef6;
+      --tooltip-radius:8px;
+      --gap:18px;
+    }
+
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;background:var(--bg);color:#e6eef6}
+    .page{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:36px;box-sizing:border-box}
+
+    .card{
+      width:calc(var(--canvas-size)*2 + var(--panel-width) + 96px);
+      max-width:calc(100vw - 48px);
+      background:var(--card);
+      border-radius:calc(var(--radius) + 6px);
+      padding:20px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.6);
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+
+    header{display:flex;flex-direction:column;gap:6px}
+    h1{margin:0;font-size:20px;font-weight:700;color:#eaf6ff}
+    .byline{margin:0;font-style:italic;color:var(--muted);font-size:13px}
+
+    .main-row{display:flex;gap:18px;align-items:flex-start}
+    .canvas-wrap{background:rgba(255,255,255,0.01);padding:10px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:8px}
+    canvas{width:var(--canvas-size);height:var(--canvas-size);border-radius:8px;background:#000;box-shadow:0 8px 30px rgba(0,0,0,0.6);cursor:crosshair;image-rendering:pixelated}
+    .caption{font-size:13px;color:var(--muted);text-align:center;width:var(--canvas-size)}
+    .coords{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;width:var(--canvas-size)}
+
+    aside.panel{width:var(--panel-width);background:rgba(255,255,255,0.012);padding:16px;border-radius:12px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
+    .panel-title{font-size:13px;color:#dbe9f6;font-weight:700;margin:0}
+    .panel-desc{font-size:12px;color:var(--muted);margin:0}
+    .legend{display:flex;flex-direction:column;gap:8px}
+    .legend-row{display:flex;gap:10px;align-items:center}
+    .legend-dot{width:18px;height:18px;border-radius:5px;border:1px solid rgba(0,0,0,0.35)}
+    .legend-label{font-size:13px;color:var(--muted)}
+
+    .annotation{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;color:var(--muted);font-size:13px;line-height:1.45}
+
+    /* Formula / chips in panel */
+    .formula-panel{background:rgba(255,255,255,0.015);padding:10px;border-radius:10px}
+    .formula-inline{font-size:18px;margin-bottom:8px}
+    .formula-vars{display:flex;gap:10px;flex-wrap:wrap}
+    .var-chip{
+      display:inline-block;background:rgba(255,255,255,0.02);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);
+      color:#eaf6ff;font-weight:600;cursor:default;position:relative;
+    }
+    .var-chip .tooltip{
+      position:absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      min-width:220px;
+      max-width:320px;
+      background: var(--tooltip-bg);
+      color: var(--tooltip-color);
+      padding:10px;
+      border-radius: var(--tooltip-radius);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .18s ease, transform .18s ease;
+      transform-origin: bottom center;
+      font-size:13px;
+      line-height:1.35;
+      z-index:40;
+      white-space:normal;
+    }
+    .var-chip:hover .tooltip,
+    .var-chip:focus-within .tooltip{ opacity:1; pointer-events:auto; transform: translateX(-50%) translateY(-6px); }
+    .var-chip .tooltip:after{ content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid var(--tooltip-bg); }
+
+    /* Iteration control */
+    .iter-row{display:flex;flex-direction:column;gap:8px}
+    .iter-controls{display:flex;gap:8px;align-items:center}
+    input[type="range"]{width:100%}
+    .iter-value{font-weight:700;color:#eaf6ff}
+
+    input[type="checkbox"], button{background:var(--glass);color:#e9f0f6;border-radius:10px;border:1px solid rgba(255,255,255,0.04);padding:8px}
+    button{cursor:pointer}
+    .small{padding:6px 8px;font-size:12px;border-radius:8px}
+
+    @media (max-width:1200px){
+      :root{--canvas-size:320px;--panel-width:320px}
+      .card{padding:14px}
+      .main-row{flex-direction:column;align-items:center}
+      canvas{height:var(--canvas-size);width:100%;max-width:var(--canvas-size)}
+      aside.panel{width:100%}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card" role="main" aria-label="Julia und Mandelbrot">
+
+      <header>
+        <h1>Der Zusammenhang zwischen Julia‑Mengen und der Mandelbrot‑Menge</h1>
+        <p class="byline"><em>Cheyenne M. Lühning und Fabian Heller</em></p>
+      </header>
+
+      <div class="main-row" role="region" aria-label="Visualisierungen und Steuerung">
+        <div class="canvas-wrap" id="mandelWrap" aria-label="Mandelbrot">
+          <canvas id="mandelbrotCanvas" width="420" height="420" title="Mandelbrot"></canvas>
+          <div class="caption">Mandelbrot‑Menge — Maus: wählt Parameter \(c\)</div>
+          <div class="coords"><span id="m-coord">c = 0 + 0i</span><span id="m-zoom">zoom: 1x</span></div>
+        </div>
+
+        <div class="canvas-wrap" id="juliaWrap" aria-label="Julia">
+          <canvas id="juliaCanvas" width="420" height="420" title="Julia"></canvas>
+          <div class="caption">Julia‑Menge für aktuellen Parameter \(c\)</div>
+          <div class="coords"><span id="j-coord">c = 0 + 0i</span><span id="j-status">live</span></div>
+        </div>
+
+        <aside class="panel" aria-label="Seitensteuerung">
+          <!-- Formel (oben in rechter Spalte) -->
+          <div class="formula-panel" aria-hidden="false">
+            <div class="panel-title">Formel</div>
+            <div class="panel-desc">Interaktive Darstellung der Iterationsregel</div>
+            <div class="formula-inline" id="latex-render"></div>
+
+            <div class="formula-vars" style="margin-top:8px">
+              <div class="var-chip" tabindex="0" id="chip-znext" aria-describedby="tip-znext"><span id="label-znext"></span>
+                <div class="tooltip" role="tooltip" id="tip-znext"></div>
+              </div>
+
+              <div class="var-chip" tabindex="0" id="chip-zn" aria-describedby="tip-zn"><span id="label-zn"></span>
+                <div class="tooltip" role="tooltip" id="tip-zn"></div>
+              </div>
+
+              <div class="var-chip" tabindex="0" id="chip-c" aria-describedby="tip-c"><span id="label-c"></span>
+                <div class="tooltip" role="tooltip" id="tip-c"></div>
+              </div>
+
+              <div class="var-chip" tabindex="0" id="chip-z0" aria-describedby="tip-z0"><span id="label-z0"></span>
+                <div class="tooltip" role="tooltip" id="tip-z0"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Iteration control (unter Formel) -->
+          <div class="panel-block iter-row" aria-hidden="false">
+            <div class="panel-title">Iteration</div>
+            <div class="panel-desc">Maximale Anzahl der Iterationen für Escape‑Test</div>
+            <div class="iter-controls">
+              <input id="iterRange" type="range" min="50" max="3000" value="400" step="10" />
+              <div class="iter-value" id="iterVal">400</div>
+            </div>
+          </div>
+
+          <!-- Farben -->
+          <div>
+            <div class="panel-title">Farben</div>
+            <div class="panel-desc">Regenbogenpalette kodiert Fluchtgeschwindigkeit; Inneres bleibt schwarz.</div>
+            <div class="legend" style="margin-top:8px">
+              <div class="legend-row"><div class="legend-dot" style="background:linear-gradient(90deg,#ffffff,#ffd880)"></div><div class="legend-label">Weiß → sehr schnelle Flucht</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:linear-gradient(90deg,#ff6b40,#ff3fa0)"></div><div class="legend-label">Rot/Magenta → mittlere Flucht</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:linear-gradient(90deg,#5b8aff,#1a3fff)"></div><div class="legend-label">Blau → langsame Flucht</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#000000"></div><div class="legend-label">Schwarz → Punkte im Inneren</div></div>
+            </div>
+          </div>
+
+          <!-- Ansicht (unten) -->
+          <div>
+            <div class="panel-title">Ansicht</div>
+            <div class="panel-desc">Freeze, Reset und Export für die Julia‑Ansicht</div>
+
+            <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+              <label style="font-size:13px;color:var(--muted)">Freeze Julia</label>
+              <input type="checkbox" id="freezeJulia" />
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button id="resetBtn" class="small">Reset View</button>
+              <button id="exportM" class="small">Export Mandelbrot</button>
+              <button id="exportJ" class="small">Export Julia</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Bottom: nur kurze Erklärung -->
+      <div class="annotation" aria-live="polite">
+        <div style="font-weight:700;margin-bottom:6px">Kurz erklärt (ohne mathematische Symbole)</div>
+        <div style="color:var(--muted)">
+          Die Mandelbrot‑Menge ist eine visuelle Karte von Parametern. Für jeden Punkt auf dieser Karte prüft man, ob die zugehörige Bahn stabil bleibt oder nach einiger Zeit unkontrolliert wächst. Punkte, bei denen die Bahn stabil bleibt, bilden die charakteristische zusammenhängende Form der Mandelbrot‑Menge.
+          <br><br>
+          Die Julia‑Menge ist das Fraktal, das zu einem einzelnen Parameter gehört. Für einen festen Parameter zeigt die Julia‑Menge alle Startpunkte, deren Bahnen unter wiederholter Anwendung derselben Regel beschränkt bleiben. Je nach Parameter ist die Julia‑Menge entweder eine zusammenhängende Figur oder in viele kleine Teile zerlegt.
+          <br><br>
+          Jeder Punkt der Mandelbrot‑Karte steht für genau eine Julia‑Menge. Liegt ein Parameter innerhalb der Mandelbrot‑Menge, ist die zugehörige Julia‑Menge zusammenhängend; liegt er außerhalb, ist die Julia‑Menge meist zerteilt.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // KaTeX render & variable labels + definitions (definitions without formulas)
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.katex) {
+        katex.render("\\displaystyle z_{n+1} = z_n^{2} + c", document.getElementById('latex-render'), {throwOnError:false, displayMode:false});
+
+        katex.render("\\displaystyle z_{n+1}", document.getElementById('label-znext'), {throwOnError:false, displayMode:false});
+        katex.render("\\displaystyle z_n", document.getElementById('label-zn'), {throwOnError:false, displayMode:false});
+        katex.render("\\displaystyle c", document.getElementById('label-c'), {throwOnError:false, displayMode:false});
+        katex.render("\\displaystyle z_0", document.getElementById('label-z0'), {throwOnError:false, displayMode:false});
+      }
+
+      // Fill tooltip texts (no formulas inside text)
+      const fill = (id, title, text) => {
+        const el = document.getElementById(id);
+        el.innerHTML = "";
+        // title as KaTeX rendered label already present above, add description
+        const d = document.createElement('div');
+        d.style.color = 'var(--muted)';
+        d.style.fontSize = '13px';
+        d.style.lineHeight = '1.35';
+        d.textContent = text;
+        el.appendChild(d);
+      };
+
+      fill('tip-znext', 'z_{n+1}', 'Der unmittelbar folgende Wert in einer durch wiederholte Anwendung entstehenden Zahlenfolge; er beschreibt den Zustand des Systems nach einem Iterationsschritt und liefert Hinweise darauf, wie sich der Orbit kurzfristig verändert.');
+      fill('tip-zn', 'z_n', 'Der gegenwärtige Wert der Orbitfolge; er stellt den aktuellen Zustand dar, von dem aus der nächste Iterationsschritt ausgeführt wird und anhand dessen Stabilitäts- oder Divergenzeigenschaften beurteilt werden.');
+      fill('tip-c', 'c', 'Ein unveränderlicher komplexer Parameter, der die nichtlineare Dynamik des Systems bestimmt; unterschiedliche c‑Werte erzeugen unterschiedliche Fraktalformen und steuern, ob Orbits tendenziell gebunden oder auseinanderlaufen.');
+      fill('tip-z0', 'z_0', 'Der Anfangswert, mit dem die Folge gestartet wird; er entspricht in visuellen Darstellungen einem einzelnen Pixelpunkt, dessen langfristiges Verhalten beobachtet wird.');
+    });
+
+    // Canvas & contexts
+    const mCanvas = document.getElementById('mandelbrotCanvas');
+    const jCanvas = document.getElementById('juliaCanvas');
+    const mCtx = mCanvas.getContext('2d');
+    const jCtx = jCanvas.getContext('2d');
+    const WIDTH = mCanvas.width, HEIGHT = mCanvas.height;
+
+    // Controls
+    const iterRange = document.getElementById('iterRange');
+    const iterVal = document.getElementById('iterVal');
+    const freezeJulia = document.getElementById('freezeJulia');
+    const resetBtn = document.getElementById('resetBtn');
+    const exportM = document.getElementById('exportM');
+    const exportJ = document.getElementById('exportJ');
+
+    let mView = { xMin:-2.5, xMax:1.0, yMin:-1.6, yMax:1.6 };
+    let jView = { xMin:-1.6, xMax:1.6, yMin:-1.6, yMax:1.6 };
+    let mZoom = 1;
+    let maxIter = parseInt(iterRange.value,10);
+    iterVal.textContent = maxIter;
+    let currentC = {re:0, im:0};
+    let juliaFrozen = false;
+
+    // Complex helpers and iteration
+    function complex(re,im){ return {re,im}; }
+    function cMul(a,b){ return {re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re}; }
+    function cAdd(a,b){ return {re: a.re + b.re, im: a.im + b.im}; }
+    function cAbs2(a){ return a.re*a.re + a.im*a.im; }
+    function iterFunc(z,c){ return cAdd(cMul(z,z), c); }
+
+    function hsvToRgb(h,s,v){
+      const c = v*s; const hp = h/60; const x = c*(1 - Math.abs(hp%2 -1)); let r=0,g=0,b=0;
+      if (0<=hp && hp<1){ r=c; g=x; b=0; } else if (1<=hp && hp<2){ r=x; g=c; b=0; } else if (2<=hp && hp<3){ r=0; g=c; b=x; }
+      else if (3<=hp && hp<4){ r=0; g=x; b=c; } else if (4<=hp && hp<5){ r=x; g=0; b=c; } else { r=c; g=0; b=x; }
+      const m = v - c; return [ (r+m)*255, (g+m)*255, (b+m)*255 ];
+    }
+    function rainbowPalette(t){
+      const s = Math.max(0, Math.min(1, Math.pow(t,0.6)));
+      if (s < 0.06){ const u = s/0.06; return [255, Math.round(255 - 40*u), Math.round(255 - 230*u)]; }
+      const hue = 15 + 300 * s; return hsvToRgb(hue % 360, 0.95, 1.0).map(v => Math.round(v));
+    }
+    function smoothColor(i, zr, zi, maxI){
+      if (i >= maxI) return 0;
+      const log_zn = Math.log(zr*zr + zi*zi)/2;
+      const nu = Math.log(log_zn/Math.log(2))/Math.log(2);
+      return Math.max(0, Math.min(1, (i + 1 - nu) / maxI));
+    }
+
+    // Escape computations
+    function mandelbrotEscape(c, maxI){
+      let z = {re:0,im:0}, i=0;
+      while (i < maxI && cAbs2(z) <= 4.0){ z = iterFunc(z,c); i++; }
+      return {i, zr:z.re, zi:z.im};
+    }
+    function juliaEscape(z0, c, maxI){
+      let z = {re:z0.re,im:z0.im}, i=0;
+      while (i < maxI && cAbs2(z) <= 4.0){ z = iterFunc(z,c); i++; }
+      return {i, zr:z.re, zi:z.im};
+    }
+
+    // Rendering
+    function renderMandelbrot(){
+      const img = mCtx.createImageData(WIDTH, HEIGHT);
+      const data = img.data;
+      for (let px=0; px<WIDTH; px++){
+        for (let py=0; py<HEIGHT; py++){
+          const c = complex(mView.xMin + (px/WIDTH)*(mView.xMax - mView.xMin), mView.yMin + (py/HEIGHT)*(mView.yMax - mView.yMin));
+          const res = mandelbrotEscape(c, maxIter);
+          const idx = (py*WIDTH + px)*4;
+          if (res.i >= maxIter){ data[idx]=0; data[idx+1]=0; data[idx+2]=0; data[idx+3]=255; }
+          else { const t = smoothColor(res.i, res.zr, res.zi, maxIter); const col = rainbowPalette(t); data[idx]=col[0]; data[idx+1]=col[1]; data[idx+2]=col[2]; data[idx+3]=255; }
+        }
+      }
+      mCtx.putImageData(img,0,0);
+    }
+
+    function renderJulia(c){
+      const img = jCtx.createImageData(WIDTH, HEIGHT);
+      const data = img.data;
+      for (let px=0; px<WIDTH; px++){
+        for (let py=0; py<HEIGHT; py++){
+          const z0 = complex(jView.xMin + (px/WIDTH)*(jView.xMax - jView.xMin), jView.yMin + (py/HEIGHT)*(jView.yMax - jView.yMin));
+          const res = juliaEscape(z0, c, maxIter);
+          const idx = (py*WIDTH + px)*4;
+          if (res.i >= maxIter){ data[idx]=0; data[idx+1]=0; data[idx+2]=0; data[idx+3]=255; }
+          else { const t = smoothColor(res.i, res.zr, res.zi, maxIter); const col = rainbowPalette(t); const dx = (px - WIDTH/2)/(WIDTH/2); const dy = (py - HEIGHT/2)/(HEIGHT/2); const dist = Math.sqrt(dx*dx + dy*dy); const shade = 1 - Math.min(0.45, dist*0.4); data[idx]=Math.floor(col[0]*shade); data[idx+1]=Math.floor(col[1]*shade); data[idx+2]=Math.floor(col[2]*shade); data[idx+3]=255; }
+        }
+      }
+      jCtx.putImageData(img,0,0);
+    }
+
+    // Interaction handlers
+    function complexFromPixelM(px, py){
+      return complex(mView.xMin + (px/WIDTH)*(mView.xMax - mView.xMin), mView.yMin + (py/HEIGHT)*(mView.yMax - mView.yMin));
+    }
+
+    mCanvas.addEventListener('mousemove', (e) => {
+      const rect = mCanvas.getBoundingClientRect();
+      const x = Math.max(0, Math.min(WIDTH, Math.floor((e.clientX - rect.left) * (mCanvas.width/rect.width))));
+      const y = Math.max(0, Math.min(HEIGHT, Math.floor((e.clientY - rect.top) * (mCanvas.height/rect.height))));
+      const c = complexFromPixelM(x,y);
+      currentC = c;
+      document.getElementById('m-coord').textContent = `c = ${c.re.toFixed(6)} ${c.im>=0?'+':'-'} ${Math.abs(c.im).toFixed(6)}i`;
+      document.getElementById('j-coord').textContent = document.getElementById('m-coord').textContent;
+      if (!juliaFrozen) renderJulia(currentC);
+    });
+
+    // Click-to-zoom and wheel zoom (Mandelbrot)
+    mCanvas.addEventListener('click', (e)=>{
+      const rect = mCanvas.getBoundingClientRect();
+      const x = Math.max(0, Math.min(WIDTH, Math.floor((e.clientX - rect.left) * (mCanvas.width/rect.width))));
+      const y = Math.max(0, Math.min(HEIGHT, Math.floor((e.clientY - rect.top) * (mCanvas.height/rect.height))));
+      const center = complexFromPixelM(x,y);
+      const w = (mView.xMax - mView.xMin)/2; const h = (mView.yMax - mView.yMin)/2;
+      mView.xMin = center.re - w/2; mView.xMax = center.re + w/2;
+      mView.yMin = center.im - h/2; mView.yMax = center.im + h/2;
+      mZoom *= 2; document.getElementById('m-zoom').textContent = `zoom: ${mZoom.toFixed(1)}x`;
+      renderMandelbrot(); if (!juliaFrozen) renderJulia(currentC);
+    });
+
+    mCanvas.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      const rect = mCanvas.getBoundingClientRect();
+      const mx = Math.max(0, Math.min(WIDTH, Math.floor((e.clientX - rect.left) * (mCanvas.width/rect.width))));
+      const my = Math.max(0, Math.min(HEIGHT, Math.floor((e.clientY - rect.top) * (mCanvas.height/rect.height))));
+      const mouseC = complexFromPixelM(mx,my);
+      const zoomFactor = e.deltaY > 0 ? 1.12 : 0.88;
+      const newWidth = (mView.xMax - mView.xMin) * zoomFactor;
+      const newHeight = (mView.yMax - mView.yMin) * zoomFactor;
+      const reRatio = (mouseC.re - mView.xMin)/(mView.xMax - mView.xMin);
+      const imRatio = (mouseC.im - mView.yMin)/(mView.yMax - mView.yMin);
+      mView.xMin = mouseC.re - reRatio * newWidth; mView.xMax = mView.xMin + newWidth;
+      mView.yMin = mouseC.im - imRatio * newHeight; mView.yMax = mouseC.yMin + newHeight;
+      mZoom = Math.max(0.125, mZoom * (e.deltaY > 0 ? 1.12 : 0.88));
+      document.getElementById('m-zoom').textContent = `zoom: ${mZoom.toFixed(2)}x`;
+      renderMandelbrot(); if (!juliaFrozen) renderJulia(currentC);
+    }, {passive:false});
+
+    // Iteration control wiring
+    iterRange.addEventListener('input', () => {
+      maxIter = parseInt(iterRange.value,10);
+      iterVal.textContent = maxIter;
+      // re-render both with new iteration cap
+      renderMandelbrot();
+      if (!juliaFrozen) renderJulia(currentC);
+    });
+
+    // Freeze toggle
+    freezeJulia.addEventListener('change', (e) => {
+      juliaFrozen = e.target.checked;
+      document.getElementById('j-status').textContent = juliaFrozen ? 'frozen' : 'live';
+    });
+
+    // Reset & export
+    resetBtn.addEventListener('click', () => {
+      mView = { xMin:-2.5, xMax:1.0, yMin:-1.6, yMax:1.6 };
+      jView = { xMin:-1.6, xMax:1.6, yMin:-1.6, yMax:1.6 };
+      mZoom = 1; document.getElementById('m-zoom').textContent = `zoom: ${mZoom.toFixed(1)}x`;
+      renderMandelbrot(); if (!juliaFrozen) renderJulia(currentC);
+    });
+    exportM.addEventListener('click', () => { const a=document.createElement('a'); a.download='mandelbrot.png'; a.href=mCanvas.toDataURL('image/png'); a.click(); });
+    exportJ.addEventListener('click', () => { const a=document.createElement('a'); a.download='julia.png'; a.href=jCanvas.toDataURL('image/png'); a.click(); });
+
+    // Initial render
+    renderMandelbrot();
+    renderJulia(currentC);
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'r') resetBtn.click();
+      if (e.key === 'f') { freezeJulia.checked = !freezeJulia.checked; freezeJulia.dispatchEvent(new Event('change')); }
+    });
+
+    // Re-render on resize
+    window.addEventListener('resize', () => { renderMandelbrot(); if (!juliaFrozen) renderJulia(currentC); });
+  </script>
+</body>
+</html>
