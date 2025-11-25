@@ -8,6 +8,7 @@
   <!-- KaTeX -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
   <style>
     :root{
@@ -203,7 +204,7 @@
 
       <!-- Bottom: nur kurze Erklärung -->
       <div class="annotation" aria-live="polite">
-        <div style="font-weight:700;margin-bottom:6px">Kurz erklärt (ohne mathematische Symbole)</div>
+        <div style="font-weight:700;margin-bottom:6px">Kurz erklärt</div>
         <div style="color:var(--muted)">
           Die Mandelbrot‑Menge ist eine visuelle Karte von Parametern. Für jeden Punkt auf dieser Karte prüft man, ob die zugehörige Bahn stabil bleibt oder nach einiger Zeit unkontrolliert wächst. Punkte, bei denen die Bahn stabil bleibt, bilden die charakteristische zusammenhängende Form der Mandelbrot‑Menge.
           <br><br>
@@ -240,9 +241,9 @@
         el.appendChild(d);
       };
 
-      fill('tip-znext', 'z_{n+1}', 'Der unmittelbar folgende Wert in einer durch wiederholte Anwendung entstehenden Zahlenfolge; er beschreibt den Zustand des Systems nach einem Iterationsschritt und liefert Hinweise darauf, wie sich der Orbit kurzfristig verändert.');
+      fill('tip-znext', 'z_{n+1}', 'der nächste Punkt in der Zahlenfolge, der durch die Iterationsregel entsteht. Er zeigt, wie sich das System Schritt für Schritt weiterentwickelt.');
       fill('tip-zn', 'z_n', 'Der gegenwärtige Wert der Orbitfolge; er stellt den aktuellen Zustand dar, von dem aus der nächste Iterationsschritt ausgeführt wird und anhand dessen Stabilitäts- oder Divergenzeigenschaften beurteilt werden.');
-      fill('tip-c', 'c', 'Ein unveränderlicher komplexer Parameter, der die nichtlineare Dynamik des Systems bestimmt; unterschiedliche c‑Werte erzeugen unterschiedliche Fraktalformen und steuern, ob Orbits tendenziell gebunden oder auseinanderlaufen.');
+      fill('tip-c', 'c', 'Ein unveränderlicher komplexer Parameter, der die nichtlineare Dynamik des Systems bestimmt; unterschiedliche Parameterwerte erzeugen unterschiedliche Fraktalformen und steuern, ob Orbits tendenziell gebunden oder auseinanderlaufen.');
       fill('tip-z0', 'z_0', 'Der Anfangswert, mit dem die Folge gestartet wird; er entspricht in visuellen Darstellungen einem einzelnen Pixelpunkt, dessen langfristiges Verhalten beobachtet wird.');
     });
 
